@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+	<meta name="apple-mobile-web-app-capable" content="yes">
+	<link href="https://fonts.googleapis.com/css?family=Lato" rel="stylesheet">
+	<title>Tatatu</title>
+	
+	<style>
+	html, body {
+		padding: 0;
+		margin: 0;
+		color: #fff;
+		background-color: #000;
+		font-family: 'Lato', sans-serif;
+	}
+	
+	.center-wrapper {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 100%;
+		height: 100vh;
+	}
+	
+	input {
+		height: 38px;
+		padding: 6px 10px;
+		border: 1px solid #D1D1D1;
+		border-radius: 4px;
+		box-shadow: none;
+		box-sizing: border-box;
+		margin-bottom: 1rem;
+	}
+	input:focus {
+		border: 1px solid #ff0000;
+    	outline: none;
+	}
+	
+	button, .btn {
+		height: 38px;
+		color: #FFF;
+		background-color: #ff0000;
+		padding: 0 30px;
+		text-align: center;
+		font-size: 11px;
+		font-weight: 600;
+		line-height: 38px;
+		letter-spacing: .1rem;
+		text-transform: uppercase;
+		text-decoration: none;
+		white-space: nowrap;
+		border-radius: 4px;
+		border: 1px solid #ff0000;
+		cursor: pointer;
+		box-sizing: border-box;
+		outline: none;
+	}
+	button:hover, .btn:hover {
+    	background-color: rgb(255, 82, 82);
+    	border-color: rgb(255, 82, 82);
+	}
+	
+	input, button, .btn {
+		display: block;
+		width: 200px;
+	}
+	
+	button.loading:after {
+		border: 3px solid #FFF;
+		border-top: 3px solid rgba(255, 255, 255, .2);
+		border-radius: 50%;
+		width: 16px;
+		height: 16px;
+		animation: loader-spin 1.25s linear infinite;
+		content: "";
+		display: inline-block;
+		position: relative;
+		left: -13px;
+		top: 6px;
+	}
+	button.loading {
+		pointer-events: none;
+		font-size: 0;
+	}
+
+	@keyframes loader-spin {
+		0% { transform: rotate(0deg); }
+		100% { transform: rotate(360deg); }
+	}
+	
+	#result {
+		max-width: 500px;
+		min-width: 400px;
+		padding: 2em;
+		border: 1px solid rgb(255, 82, 82);
+		border-radius: 4px;
+		word-wrap: break-word;
+		letter-spacing: 1px;
+		display: block;
+		font-size: 12px;
+	}
+	#privatekey-content, #publickey-content {
+		display: block;
+		color: rgba(255,255,255,.75);
+		font-size: 11px;
+		text-align: center;
+		margin-top: 10px;
+		margin-bottom: 10px;
+	}
+	h3 { margin-top: 0; }
+	</style>
+</head>
+<body>
+	<script charset="utf-8" src="https://cdn.ethers.io/scripts/ethers-v2.min.js" type="text/javascript"></script>
+	<script>
+	// Simple selector
+	function $(selector, p) {
+		p = p || document;
+		return p.querySelector(selector);
+	}
+	
+	// Post data to server, return a promise
+	function $post(url, data) {
+		return new Promise(function (resolve, reject) {
+			var xhttp = new XMLHttpRequest();
+			xhttp.onreadystatechange = function () {
+				if (xhttp.readyState == 4) {
+					if (xhttp.status == 200) {
+						if (xhttp.responseText == 1) {
+							resolve(true);
+						} else {
+							reject(new Error(xhttp.responseText));
+						}
+					} else {
+						reject(new Error('Server returned an error code ' + xhttp.status));
+					}
+				}
+			};
+			xhttp.open('POST', url, true);
+			xhttp.setRequestHeader('Content-type', 'application/json; charset=utf-8');
+	        xhttp.send(JSON.stringify(data));
+		});
+	}
+	
+	// Called when button is clicked
+	function createWallet() {
+		var wallet = ethers.Wallet.createRandom();
+		var $password = $('#password');
+		var $button = $('#button');
+		var $result = $('#result');
+		var $form = $('#form');
+		var $key_content = $('#privatekey-content');
+		var $pkey_content = $('#publickey-content');
+		var $key_file = $('#privatekey-file');
+		
+		// Loading
+		$button.classList.add('loading');
+		
+		$pkey_content.textContent = wallet.address;
+		
+		Promise.all([
+			// Encrypt
+			wallet.encrypt($password.value),
+			
+			// Save public key
+			$post('/save-public.php', { publicKey: wallet.address }).catch(function (err) {
+				throw new Error('Failed to attach your wallet to our servers: ' + err.message);
+			})
+		]).then(
+			function (values) {
+				$button.classList.remove('loading');
+				$result.style.display = 'block';
+				$form.style.display = 'none';
+				
+				$key_content.textContent = wallet.privateKey;
+				$key_file.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(values[0]));
+  				$key_file.setAttribute('download', 'private-key.json');
+			},
+			function (err) {
+				$button.classList.remove('loading');
+				alert(err.message);
+			}
+		);
+	}
+	</script>
+	
+	<div class="center-wrapper">
+		<div>
+			<div style="text-align:center; margin-bottom: 30px;">
+				<img style="width: 150px;" src="https://tatatu.com/wp-content/uploads/2018/05/tatatu_logo.png" alt="tatatu.com" />
+			</div>
+			<div id="form">
+				<input type="text" id="password" placeholder="Private key password"/>
+				<button id="button" onclick="createWallet()">Create my wallet</button>
+			</div>
+			<div id="result" style="display: none">
+				<h3>Your wallet has been created.</h3>
+				
+				Your public key is <div id="publickey-content"></div>
+				
+				Your unprotected private key is <div id="privatekey-content"></div>
+				
+				
+				<a class="btn" id="privatekey-file" style="width: 300px; margin: auto; margin-top:30px;">DOWNLOAD THE KEYSTORE FILE</a>
+			</div>
+		</div>
+	</div>
+</body>
+</html>
